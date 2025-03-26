@@ -545,10 +545,10 @@ const AnnotationAnalysisApp: React.FC = () => {
   };
   // S3 Configuration
   const s3Client = new S3Client({
-    region: "ap-southeast-1",
+    region: import.meta.env.VITE_AWS_REGION,
     credentials: {
-      accessKeyId: "AKIAQJDGSPZB3XSTNBGN",
-      secretAccessKey: "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",
+      accessKeyId: import.meta.env.VITE_ACCESS_KEY_ID,
+      secretAccessKey: import.meta.env.VITE_SECRET_ACCESS_KEY,
     },
   });
 
@@ -560,7 +560,7 @@ const AnnotationAnalysisApp: React.FC = () => {
       // Fetch files from each annotator folder
       for (const folder of Object.keys(ANNOTATORS)) {
         const command = new ListObjectsV2Command({
-          Bucket: "corpus-labeling",
+          Bucket: import.meta.env.VITE_S3_BUCKET,
           Prefix: `${folder}/`,
         });
 
@@ -569,7 +569,7 @@ const AnnotationAnalysisApp: React.FC = () => {
         const filePromises =
           response.Contents?.map(async (file) => {
             const getCommand = new GetObjectCommand({
-              Bucket: "corpus-labeling",
+              Bucket: import.meta.env.VITE_S3_BUCKET,
               Key: file.Key,
             });
 
