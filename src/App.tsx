@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import {
   S3Client,
@@ -5,7 +7,7 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import "./App.css";
-
+import TEST_SET_1 from "./assets/test_set_1_output_pos.json";
 const LABELS = [
   "N",
   "Np",
@@ -66,7 +68,7 @@ const LABEL_COLORS: Record<string, string> = {
 };
 
 // Annotator mapping (folder name to display name)
-const ANNOTATORS = {
+const ANNOTATORS: Record<string, string> = {
   phuong_ngan: "Phương Ngân",
   le_ngoc: "Lê Ngọc",
   minh_ngoc: "Minh Ngọc",
@@ -110,8 +112,29 @@ const TextComparisonModal: React.FC<{
   annotatorFiles: Record<string, AnnotationFile | null>;
   annotatorNames: Record<string, string>;
   labelColors: Record<string, string>;
-}> = ({ isOpen, onClose, text, annotatorFiles, annotatorNames }) => {
+  correctAnnotations?: {
+    plainText: string;
+    annotations: { start: number; end: number; text: string; tag: string }[];
+  };
+}> = ({
+  isOpen,
+  onClose,
+  text,
+  annotatorFiles,
+  annotatorNames,
+  correctAnnotations,
+}) => {
   if (!isOpen) return null;
+
+  // Convert correct annotations to AnnotationValue format if they exist
+  const formattedCorrectAnnotations = correctAnnotations?.annotations.map(
+    (ann) => ({
+      start: ann.start,
+      end: ann.end,
+      text: ann.text,
+      labels: [ann.tag],
+    })
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
@@ -146,6 +169,24 @@ const TextComparisonModal: React.FC<{
             <h3 className="font-semibold mb-2 text-black">Văn bản gốc:</h3>
             <p className="text-gray-800">{text}</p>
           </div>
+
+          {/* Show the correct annotation at the top if available */}
+          {formattedCorrectAnnotations && (
+            <div className="mb-6 border-2 border-yellow-400 rounded-lg p-4 relative">
+              <div className="absolute top-0 left-0 transform -translate-y-1/2 bg-yellow-500 text-white px-3 py-1 rounded-full">
+                Nhãn chuẩn
+              </div>
+              <div className="mt-4">
+                <HighlightedText
+                  text={correctAnnotations?.plainText || ""}
+                  annotations={formattedCorrectAnnotations}
+                />
+              </div>
+              <div className="mt-2 text-sm font-medium text-yellow-600">
+                {formattedCorrectAnnotations.length} nhãn từ bộ dữ liệu chuẩn
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-6">
             {Object.entries(annotatorFiles).map(([folder, file]) => {
@@ -502,7 +543,13 @@ const LabelLegend: React.FC = () => {
 const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonText, setComparisonText] = useState("");
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
-
+  const [accuracyResults, setAccuracyResults] = useState<{
+    annotatorAccuracy: Record<
+      string,
+      { accuracy: number; matches: number; total: number }
+    >;
+    averageAccuracy: number;
+  } | null>(null);
   const [expandedAnnotator, setExpandedAnnotator] = useState<string | null>(
     null
   );
@@ -521,7 +568,7 @@ const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonFiles, setComparisonFiles] = useState<
     Record<string, AnnotationFile | null>
   >({});
-
+  console.log(TEST_SET_1);
   // Add a function to find matching files across annotators
   const findMatchingFiles = (text: string) => {
     const matches: Record<string, AnnotationFile | null> = {};
@@ -535,13 +582,278 @@ const AnnotationAnalysisApp: React.FC = () => {
 
     return matches;
   };
+  const handleProcessTestFile = () => {
+    // Parse test data
+    const testData = TEST_SET_1;
 
+    // Create a processed version of the test data for comparison
+    const processedTestData = testData.map((item) => {
+      const taggedText = item.data.text;
+      const pairs = taggedText.split(" ").filter((p) => p.trim());
+
+      let plainText = "";
+      const annotations: {
+        start: number;
+        end: number;
+        text: string;
+        tag: string;
+      }[] = [];
+
+      // Process each word/tag pair
+      pairs.forEach((pair) => {
+        const lastSlashIndex = pair.indexOf("/");
+
+        if (lastSlashIndex > 0) {
+          const word = pair.substring(0, lastSlashIndex);
+          let tag = pair.substring(lastSlashIndex + 1);
+          if (tag.indexOf("/") > 0) {
+            tag = tag.split("/")[0];
+          }
+
+          // Calculate start and end position for the annotation
+          const start = plainText.length > 0 ? plainText.length + 1 : 0;
+          if (plainText.length > 0) {
+            plainText += " ";
+          }
+          plainText += word;
+          const end = plainText.length;
+          if (tag !== word) {
+            annotations.push({
+              start,
+              end,
+              text: word,
+              tag,
+            });
+          }
+        }
+      });
+
+      return {
+        plainText,
+        annotations,
+      };
+    });
+
+    // Calculate accuracy for each annotator
+    const accuracyResults: Record<
+      string,
+      { accuracy: number; matches: number; total: number }
+    > = {};
+
+    // Process each annotator's files
+    Object.entries(folderAnnotations).forEach(([folder, files]) => {
+      let totalMatches = 0;
+      let totalAnnotations = 0;
+
+      // For each file from this annotator
+      files.forEach((file) => {
+        // Find matching test data based on text similarity
+        const bestMatch = findBestMatchingTestData(
+          file.task.data.text,
+          processedTestData
+        );
+
+        if (bestMatch) {
+          // Extract sorted annotator annotations
+          const sortedAnnotatorAnnotations = [...file.result]
+            .sort((a, b) => a.value.start - b.value.start)
+            .map((anno) => ({
+              text: anno.value.text,
+              tag: anno.value.labels[0],
+            }));
+
+          // Extract sorted test annotations
+          const sortedTestAnnotations = bestMatch
+            ? [...bestMatch.annotations].sort((a, b) => a.start - b.start)
+            : [];
+
+          // Compare annotations
+          const minLength = Math.min(
+            sortedAnnotatorAnnotations.length,
+            sortedTestAnnotations.length
+          );
+
+          for (let i = 0; i < minLength; i++) {
+            const annAnnotation = sortedAnnotatorAnnotations[i];
+            const testAnnotation = sortedTestAnnotations[i];
+
+            // Compare text and tag (case insensitive for text)
+            if (
+              annAnnotation.text.toLowerCase() ===
+                testAnnotation.text.toLowerCase() &&
+              annAnnotation.tag === testAnnotation.tag
+            ) {
+              totalMatches++;
+            }
+
+            totalAnnotations++;
+          }
+
+          // If annotator has more annotations than test data
+          if (sortedAnnotatorAnnotations.length > minLength) {
+            totalAnnotations += sortedAnnotatorAnnotations.length - minLength;
+          }
+        }
+      });
+
+      // Calculate accuracy for this annotator
+      const accuracy =
+        totalAnnotations > 0 ? totalMatches / totalAnnotations : 0;
+      accuracyResults[folder] = {
+        accuracy,
+        matches: totalMatches,
+        total: totalAnnotations,
+      };
+    });
+
+    // Calculate average accuracy
+    const totalAccuracy = Object.values(accuracyResults).reduce(
+      (sum: any, result: any) => sum + result.accuracy,
+      0
+    );
+    const averageAccuracy =
+      Object.keys(accuracyResults).length > 0
+        ? totalAccuracy / Object.keys(accuracyResults).length
+        : 0;
+
+    return {
+      annotatorAccuracy: accuracyResults,
+      averageAccuracy,
+    };
+  };
+
+  // Helper function to find the best matching test data based on text similarity
+  // Define an interface for the test data structure
+  interface TestData {
+    plainText: string;
+    annotations: { start: number; end: number; text: string; tag: string }[];
+  }
+
+  const findBestMatchingTestData = (
+    text: string,
+    testDataArray: TestData[]
+  ): TestData | null => {
+    let bestMatch: TestData | null = null;
+    let bestScore = -1;
+
+    testDataArray.forEach((testData) => {
+      // Calculate similarity between texts
+      const similarity = calculateTextSimilarity(
+        normalizeText(text),
+        normalizeText(testData.plainText)
+      );
+
+      if (similarity > bestScore && similarity > 0.7) {
+        // Threshold for considering a match
+        bestScore = similarity;
+        bestMatch = testData;
+      }
+    });
+
+    return bestMatch;
+  };
+  const calculateTextSimilarity = (text1: string, text2: string) => {
+    const maxLength = Math.max(text1.length, text2.length);
+    if (maxLength === 0) return 1.0; // Both strings are empty
+
+    // Calculate Levenshtein distance
+    const distance = levenshteinDistance(text1, text2);
+
+    // Convert to similarity score
+    return 1.0 - distance / maxLength;
+  };
+
+  // Calculate Levenshtein distance between two strings
+  const levenshteinDistance = (s1: string, s2: string) => {
+    const track = Array(s2.length + 1)
+      .fill(null)
+      .map(() => Array(s1.length + 1).fill(null));
+
+    for (let i = 0; i <= s1.length; i += 1) {
+      track[0][i] = i;
+    }
+
+    for (let j = 0; j <= s2.length; j += 1) {
+      track[j][0] = j;
+    }
+
+    for (let j = 1; j <= s2.length; j += 1) {
+      for (let i = 1; i <= s1.length; i += 1) {
+        const indicator = s1[i - 1] === s2[j - 1] ? 0 : 1;
+        track[j][i] = Math.min(
+          track[j][i - 1] + 1, // deletion
+          track[j - 1][i] + 1, // insertion
+          track[j - 1][i - 1] + indicator // substitution
+        );
+      }
+    }
+
+    return track[s2.length][s1.length];
+  };
+
+  // Normalize text for better comparison
+  const normalizeText = (text: string) => {
+    return text.toLowerCase().replace(/_/g, " ").replace(/\s+/g, " ").trim();
+  };
   // Add handler for comparison button
   const handleCompareText = (text: string) => {
     const matchingFiles = findMatchingFiles(text);
     setComparisonFiles(matchingFiles);
     setComparisonText(text);
+
+    // Get the corresponding correct annotation from test data
+    const testData = TEST_SET_1;
+    const processedTestData = processTestData(testData);
+    const matchingTestData = findBestMatchingTestData(text, processedTestData);
+
     setIsComparisonModalOpen(true);
+  };
+
+  // Create a function that processes test data once to avoid repetition
+  const processTestData = (testData: any[]) => {
+    return testData.map((item) => {
+      const taggedText = item.data.text;
+      const pairs = taggedText.split(" ").filter((p: string) => p.trim());
+
+      let plainText = "";
+      const annotations: { start: number; end: number; text: any; tag: any }[] =
+        [];
+
+      // Process each word/tag pair
+      pairs.forEach((pair: string) => {
+        const lastSlashIndex = pair.indexOf("/");
+        if (lastSlashIndex > 0) {
+          const word = pair.substring(0, lastSlashIndex);
+
+          let tag = pair.substring(lastSlashIndex + 1);
+          if (tag.indexOf("/") > 0) {
+            tag = tag.split("/")[0];
+          }
+
+          // Calculate start and end position for the annotation
+          const start = plainText.length > 0 ? plainText.length + 1 : 0;
+          if (plainText.length > 0) {
+            plainText += " ";
+          }
+          plainText += word;
+          const end = plainText.length;
+
+          if (tag !== word) {
+            annotations.push({
+              start,
+              end,
+              text: word,
+              tag,
+            });
+          }
+        }
+      });
+
+      return {
+        plainText,
+        annotations,
+      };
+    });
   };
   // S3 Configuration
   const s3Client = new S3Client({
@@ -816,6 +1128,58 @@ const AnnotationAnalysisApp: React.FC = () => {
         )}
       </div>
 
+      <div className="mb-8 p-4 bg-black rounded-lg shadow-sm">
+        <h2 className="text-xl font-semibold mb-4 text-amber-50">
+          Đánh giá độ chính xác Annotation
+        </h2>
+        <button
+          onClick={() => {
+            const results = handleProcessTestFile();
+            setAccuracyResults(results);
+          }}
+          className="bg-green-500 text-white px-5 py-2 rounded-md hover:bg-green-600 transition-colors"
+          disabled={isLoading}
+        >
+          Tính độ chính xác
+        </button>
+
+        {accuracyResults && (
+          <div className="mt-4 p-4 bg-white rounded-md shadow-sm">
+            <h3 className="font-bold text-lg text-center mb-4 text-black">
+              Kết quả đánh giá độ chính xác
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(accuracyResults.annotatorAccuracy).map(
+                ([folder, result]) => (
+                  <div
+                    key={folder}
+                    className="p-3 border rounded-lg bg-yellow-50"
+                  >
+                    <h4 className="font-semibold text-black">
+                      {ANNOTATORS[folder] || folder}
+                    </h4>
+                    <div className="text-xl font-bold text-yellow-600">
+                      {(result.accuracy * 100).toFixed(2)}%
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {result.matches} đúng trên tổng số {result.total} nhãn
+                    </p>
+                  </div>
+                )
+              )}
+              <div className="p-3 border rounded-lg bg-blue-50">
+                <h4 className="font-semibold text-black">
+                  Độ chính xác trung bình
+                </h4>
+                <div className="text-xl font-bold text-blue-600">
+                  {(accuracyResults.averageAccuracy * 100).toFixed(2)}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
       {isLoading ? (
         <div className="text-center p-12">
           <p className="text-lg">Loading annotation data...</p>
@@ -935,6 +1299,12 @@ const AnnotationAnalysisApp: React.FC = () => {
         annotatorFiles={comparisonFiles}
         annotatorNames={ANNOTATORS}
         labelColors={LABEL_COLORS}
+        correctAnnotations={
+          findBestMatchingTestData(
+            comparisonText,
+            processTestData(TEST_SET_1)
+          ) || undefined
+        }
       />
     </div>
   );
