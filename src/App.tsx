@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
@@ -802,9 +803,9 @@ const AnnotationAnalysisApp: React.FC = () => {
     setComparisonText(text);
 
     // Get the corresponding correct annotation from test data
-    const testData = TEST_SET_1;
-    const processedTestData = processTestData(testData);
-    const matchingTestData = findBestMatchingTestData(text, processedTestData);
+    // const testData = TEST_SET_1;
+    // const processedTestData = processTestData(testData);
+    // const matchingTestData = findBestMatchingTestData(text, processedTestData);
 
     setIsComparisonModalOpen(true);
   };
