@@ -207,8 +207,8 @@ const TextComparisonModal: React.FC<{
                   </div>
 
                   <div className="mt-2 text-sm text-gray-500">
-                    {file.result.length} annotations • Last updated:{" "}
-                    {new Date(file.updated_at).toLocaleString()}
+                    {file.result.length} annotations • Lần cập nhật cuối:{" "}
+                    {new Date(file.updated_at).toLocaleString("vi-VN")}
                   </div>
                 </div>
               );
@@ -1269,8 +1269,12 @@ const AnnotationAnalysisApp: React.FC = () => {
 
                             <div className="mt-3 text-sm text-gray-600 flex flex-wrap gap-x-6">
                               <p>
-                                <span className="font-medium">Updated:</span>{" "}
-                                {new Date(file.updated_at).toLocaleString()}
+                                <span className="font-medium">
+                                  Lần cập nhật cuối:
+                                </span>{" "}
+                                {new Date(file.updated_at).toLocaleString(
+                                  "vi-VN"
+                                )}
                               </p>
                               <p>
                                 <span className="font-medium">
