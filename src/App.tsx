@@ -618,7 +618,7 @@ const AnnotationAnalysisApp: React.FC = () => {
           }
           plainText += word;
           const end = plainText.length;
-          if (tag !== word) {
+          if (tag !== word && tag != "" && word != "") {
             annotations.push({
               start,
               end,
@@ -839,7 +839,7 @@ const AnnotationAnalysisApp: React.FC = () => {
           plainText += word;
           const end = plainText.length;
 
-          if (tag !== word) {
+          if (tag !== word && tag != "" && word != "") {
             annotations.push({
               start,
               end,
