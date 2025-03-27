@@ -139,7 +139,7 @@ const TextComparisonModal: React.FC<{
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-6xl h-5/6 overflow-hidden flex flex-col">
+      <div className="bg-white rounded-lg w-full max-w-7xl h-full overflow-hidden flex flex-col">
         <div className="p-4 bg-gray-100 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-950">
             So sánh annotation
