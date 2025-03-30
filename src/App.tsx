@@ -8,7 +8,29 @@ import {
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
 import "./App.css";
-import TEST_SET_1 from "./assets/test_set_1_output_pos.json";
+import TEST_SET_1 from "./assets/test_pos/test_set_1_output_pos.json";
+import TEST_SET_2 from "./assets/test_pos/test_set_2_output_pos.json";
+import TEST_SET_3 from "./assets/test_pos/test_set_3_output_pos.json";
+import TEST_SET_4 from "./assets/test_pos/test_set_4_output_pos.json";
+import TEST_SET_5 from "./assets/test_pos/test_set_5_output_pos.json";
+import TEST_SET_6 from "./assets/test_pos/test_set_6_output_pos.json";
+import TEST_SET_7 from "./assets/test_pos/test_set_7_output_pos.json";
+import TEST_SET_8 from "./assets/test_pos/test_set_8_output_pos.json";
+import TEST_SET_9 from "./assets/test_pos/test_set_9_output_pos.json";
+import TEST_SET_10 from "./assets/test_pos/test_set_10_output_pos.json";
+
+const TEST_SETS: Record<number, any[]> = {
+  1: TEST_SET_1,
+  2: TEST_SET_2,
+  3: TEST_SET_3,
+  4: TEST_SET_4,
+  5: TEST_SET_5,
+  6: TEST_SET_6,
+  7: TEST_SET_7,
+  8: TEST_SET_8,
+  9: TEST_SET_9,
+  10: TEST_SET_10,
+};
 const LABELS = [
   "N",
   "Np",
@@ -47,7 +69,6 @@ const EXP = [
   "Từ viết tắt",
   "Từ không phân loại",
 ];
-
 const LABEL_COLORS: Record<string, string> = {
   N: "#FF5733", // Reddish Orange
   Np: "#00FFFF", // Cyan
@@ -136,7 +157,7 @@ const TextComparisonModal: React.FC<{
       labels: [ann.tag],
     })
   );
-
+  console.log(correctAnnotations);
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-7xl h-full overflow-hidden flex flex-col">
@@ -207,7 +228,7 @@ const TextComparisonModal: React.FC<{
                   </div>
 
                   <div className="mt-2 text-sm text-gray-500">
-                    {file.result.length} annotations • Lần cập nhật cuối:{" "}
+                    {file.result.length} nhãn • Lần cập nhật cuối:{" "}
                     {new Date(file.updated_at).toLocaleString("vi-VN")}
                   </div>
                 </div>
@@ -228,244 +249,8 @@ const TextComparisonModal: React.FC<{
     </div>
   );
 };
-// Implementation of Intra-class Correlation Coefficient (ICC)
-function calculateICC(annotations: string[][]): number {
-  // Get the number of raters and subjects
-  const numRaters = annotations.length;
-  if (numRaters < 2) return 1; // Perfect agreement with single rater
+//
 
-  // Find the minimum length (number of items) across all raters
-  const numSubjects = Math.min(...annotations.map((a) => a.length));
-
-  // Align annotations to have the same length
-  const alignedAnnotations = annotations.map((a) => a.slice(0, numSubjects));
-
-  // Convert string labels to numeric values for calculation
-  const uniqueLabels = Array.from(new Set(alignedAnnotations.flat()));
-  const labelMap = new Map(uniqueLabels.map((label, index) => [label, index]));
-
-  const numericAnnotations = alignedAnnotations.map((raterAnnotations) =>
-    raterAnnotations.map((label) => labelMap.get(label) as number)
-  );
-
-  // Calculate means
-  const totalMean =
-    numericAnnotations.flat().reduce((sum, val) => sum + val, 0) /
-    (numRaters * numSubjects);
-
-  // Calculate subject means
-  const subjectMeans = Array(numSubjects).fill(0);
-  for (let i = 0; i < numSubjects; i++) {
-    for (let j = 0; j < numRaters; j++) {
-      subjectMeans[i] += numericAnnotations[j][i];
-    }
-    subjectMeans[i] /= numRaters;
-  }
-
-  // Calculate rater means
-  const raterMeans = numericAnnotations.map(
-    (raterAnnotations) =>
-      raterAnnotations.reduce((sum, val) => sum + val, 0) / numSubjects
-  );
-
-  // Calculate sum of squares
-  let ssTotal = 0;
-  let ssBetweenSubjects = 0;
-  let ssBetweenRaters = 0;
-
-  // Total sum of squares
-  for (let i = 0; i < numRaters; i++) {
-    for (let j = 0; j < numSubjects; j++) {
-      ssTotal += Math.pow(numericAnnotations[i][j] - totalMean, 2);
-    }
-  }
-
-  // Between subjects sum of squares
-  for (let i = 0; i < numSubjects; i++) {
-    ssBetweenSubjects += numRaters * Math.pow(subjectMeans[i] - totalMean, 2);
-  }
-
-  // Between raters sum of squares
-  for (let i = 0; i < numRaters; i++) {
-    ssBetweenRaters += numSubjects * Math.pow(raterMeans[i] - totalMean, 2);
-  }
-
-  // Calculate residual sum of squares
-  const ssResidual = ssTotal - ssBetweenSubjects - ssBetweenRaters;
-
-  // Calculate mean squares
-  const msBetweenSubjects = ssBetweenSubjects / (numSubjects - 1);
-  const msBetweenRaters = ssBetweenRaters / (numRaters - 1);
-  const msResidual = ssResidual / ((numSubjects - 1) * (numRaters - 1));
-
-  // Calculate ICC(2,1) - Two-way random effects, absolute agreement, single rater
-  const icc =
-    (msBetweenSubjects - msResidual) /
-    (msBetweenSubjects +
-      (numRaters - 1) * msResidual +
-      (numRaters / numSubjects) * (msBetweenRaters - msResidual));
-
-  return isNaN(icc) ? 0 : Math.max(0, Math.min(1, icc)); // Bound between 0 and 1
-}
-
-// Implementation of Krippendorff's Alpha for multiple annotators
-function calculateKrippendorffAlpha(annotations: string[][]): number {
-  console.log(annotations);
-  const numAnnotators = annotations.length;
-  if (numAnnotators < 2) return 1;
-  const minLength = Math.min(...annotations.map((a) => a.length));
-  const alignedAnnotations = annotations.map((a) => a.slice(0, minLength));
-  const uniqueValues = Array.from(new Set(alignedAnnotations.flat()));
-  const valueMap = new Map(uniqueValues.map((value, index) => [value, index]));
-  const coincidenceMatrix = Array(uniqueValues.length)
-    .fill(0)
-    .map(() => Array(uniqueValues.length).fill(0));
-  for (let i = 0; i < minLength; i++) {
-    const itemValues = alignedAnnotations.map((a) => a[i]).filter(Boolean);
-    const n = itemValues.length;
-
-    if (n <= 1) continue;
-
-    for (let j = 0; j < n; j++) {
-      for (let k = 0; k < n; k++) {
-        if (j !== k) {
-          const jValue = valueMap.get(itemValues[j])!;
-          const kValue = valueMap.get(itemValues[k])!;
-          coincidenceMatrix[jValue][kValue] += 1 / (n - 1);
-        }
-      }
-    }
-  }
-  let n = 0;
-  for (const row of coincidenceMatrix) {
-    n += row.reduce((sum, val) => sum + val, 0);
-  }
-
-  if (n === 0) return 1;
-
-  let observedDisagreement = 0;
-  for (let i = 0; i < uniqueValues.length; i++) {
-    for (let j = 0; j < uniqueValues.length; j++) {
-      if (i !== j) {
-        observedDisagreement += coincidenceMatrix[i][j];
-      }
-    }
-  }
-  observedDisagreement /= n;
-  const valueTotals = coincidenceMatrix.map((row) =>
-    row.reduce((sum, cell) => sum + cell, 0)
-  );
-
-  const totalSum = valueTotals.reduce((sum, val) => sum + val, 0);
-
-  let expectedDisagreement = 0;
-  for (let i = 0; i < uniqueValues.length; i++) {
-    for (let j = 0; j < uniqueValues.length; j++) {
-      if (i !== j) {
-        expectedDisagreement += (valueTotals[i] * valueTotals[j]) / totalSum;
-      }
-    }
-  }
-  expectedDisagreement /= totalSum - 1;
-  const alpha =
-    expectedDisagreement === 0
-      ? 1
-      : 1 - observedDisagreement / expectedDisagreement;
-
-  return isNaN(alpha) ? 0 : alpha;
-}
-
-// Implementation of Fleiss' Kappa for multiple annotators
-function calculateFleissKappa(annotations: string[][]): number {
-  // Get the number of annotators and items
-  const numAnnotators = annotations.length;
-  if (numAnnotators < 2) return 1; // Perfect agreement with single annotator
-
-  // Find the minimum length (number of items) across all annotators
-  const numItems = Math.min(...annotations.map((a) => a.length));
-
-  // Get all unique categories
-  const categories = Array.from(new Set(annotations.flat()));
-  const numCategories = categories.length;
-
-  // Create a mapping from category name to index
-  const categoryIndices = new Map<string, number>();
-  categories.forEach((category, index) => {
-    categoryIndices.set(category, index);
-  });
-
-  // Initialize the rating matrix:
-  // rows = items, columns = categories
-  // Each cell contains how many raters assigned that category to that item
-  const ratingMatrix = Array(numItems)
-    .fill(0)
-    .map(() => Array(numCategories).fill(0));
-
-  // Fill the rating matrix
-  for (let itemIndex = 0; itemIndex < numItems; itemIndex++) {
-    for (
-      let annotatorIndex = 0;
-      annotatorIndex < numAnnotators;
-      annotatorIndex++
-    ) {
-      const category = annotations[annotatorIndex][itemIndex];
-      if (category) {
-        const categoryIndex = categoryIndices.get(category)!;
-        ratingMatrix[itemIndex][categoryIndex]++;
-      }
-    }
-  }
-
-  // Calculate observed agreement (P_i for each item)
-  const itemAgreements = ratingMatrix.map((itemRatings) => {
-    const sum = itemRatings.reduce((acc, count) => acc + count, 0);
-    if (sum <= 1) return 0; // If only one rater rated this item
-
-    // Calculate P_i = sum(n_ij * (n_ij - 1)) / (n_i * (n_i - 1))
-    const agreement =
-      itemRatings.reduce((acc, count) => {
-        return acc + count * (count - 1);
-      }, 0) /
-      (sum * (sum - 1));
-
-    return agreement;
-  });
-
-  // Calculate mean observed agreement (P_o)
-  const observedAgreement =
-    itemAgreements.reduce((acc, agreement) => acc + agreement, 0) / numItems;
-
-  // Calculate expected agreement (P_e)
-  // First, calculate proportion of all ratings in each category
-  const categoryProportions = Array(numCategories).fill(0);
-  let totalRatings = 0;
-
-  for (const itemRatings of ratingMatrix) {
-    for (let j = 0; j < numCategories; j++) {
-      categoryProportions[j] += itemRatings[j];
-      totalRatings += itemRatings[j];
-    }
-  }
-
-  // Convert counts to proportions
-  for (let j = 0; j < numCategories; j++) {
-    categoryProportions[j] /= totalRatings;
-  }
-
-  // Calculate P_e = sum(p_j^2)
-  const expectedAgreement = categoryProportions.reduce(
-    (acc, proportion) => acc + proportion * proportion,
-    0
-  );
-
-  // Calculate Fleiss' Kappa
-  const kappa =
-    (observedAgreement - expectedAgreement) / (1 - expectedAgreement);
-
-  return isNaN(kappa) ? 0 : kappa;
-}
-
-// Component to render highlighted text with visible labels
 const HighlightedText: React.FC<{
   text: string;
   annotations: AnnotationValue[];
@@ -541,9 +326,15 @@ const LabelLegend: React.FC = () => {
   );
 };
 
+// Add state for selected set with a more dynamic approach
+
 const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonText, setComparisonText] = useState("");
   const [isComparisonModalOpen, setIsComparisonModalOpen] = useState(false);
+  const [selectedSet, setSelectedSet] = useState<number>(1);
+  const [availableSets, setAvailableSets] = useState<number[]>([1]);
+  const [customSetInput, setCustomSetInput] = useState<string>("");
+
   const [accuracyResults, setAccuracyResults] = useState<{
     annotatorAccuracy: Record<
       string,
@@ -555,9 +346,11 @@ const AnnotationAnalysisApp: React.FC = () => {
     null
   );
   const [annotatorAgreement, setAnnotatorAgreement] = useState<{
-    alpha?: number;
-    fleiss?: number;
-    icc?: number;
+    pairwisePrecision?: Record<
+      string,
+      { precision: number; matches: number; total: number }
+    >;
+    averagePrecision?: number;
   } | null>(null);
   const [folderAnnotations, setFolderAnnotations] = useState<
     Record<string, AnnotationFile[]>
@@ -569,8 +362,7 @@ const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonFiles, setComparisonFiles] = useState<
     Record<string, AnnotationFile | null>
   >({});
-  console.log(TEST_SET_1);
-  // Add a function to find matching files across annotators
+
   const findMatchingFiles = (text: string) => {
     const matches: Record<string, AnnotationFile | null> = {};
 
@@ -584,13 +376,15 @@ const AnnotationAnalysisApp: React.FC = () => {
     return matches;
   };
   const handleProcessTestFile = () => {
-    // Parse test data
-    const testData = TEST_SET_1;
+    let testData = TEST_SETS[0];
 
-    // Create a processed version of the test data for comparison
+    if (1 <= selectedSet && selectedSet <= 10) {
+      testData = TEST_SETS[selectedSet];
+    }
+
     const processedTestData = testData.map((item) => {
       const taggedText = item.data.text;
-      const pairs = taggedText.split(" ").filter((p) => p.trim());
+      const pairs = taggedText.split(" ").filter((p: string) => p.trim());
 
       let plainText = "";
       const annotations: {
@@ -599,9 +393,7 @@ const AnnotationAnalysisApp: React.FC = () => {
         text: string;
         tag: string;
       }[] = [];
-
-      // Process each word/tag pair
-      pairs.forEach((pair) => {
+      pairs.forEach((pair: string) => {
         const lastSlashIndex = pair.indexOf("/");
 
         if (lastSlashIndex > 0) {
@@ -610,8 +402,6 @@ const AnnotationAnalysisApp: React.FC = () => {
           if (tag.indexOf("/") > 0) {
             tag = tag.split("/")[0];
           }
-
-          // Calculate start and end position for the annotation
           const start = plainText.length > 0 ? plainText.length + 1 : 0;
           if (plainText.length > 0) {
             plainText += " ";
@@ -646,29 +436,22 @@ const AnnotationAnalysisApp: React.FC = () => {
       let totalMatches = 0;
       let totalAnnotations = 0;
 
-      // For each file from this annotator
       files.forEach((file) => {
-        // Find matching test data based on text similarity
         const bestMatch = findBestMatchingTestData(
           file.task.data.text,
           processedTestData
         );
 
         if (bestMatch) {
-          // Extract sorted annotator annotations
           const sortedAnnotatorAnnotations = [...file.result]
             .sort((a, b) => a.value.start - b.value.start)
             .map((anno) => ({
               text: anno.value.text,
               tag: anno.value.labels[0],
             }));
-
-          // Extract sorted test annotations
           const sortedTestAnnotations = bestMatch
             ? [...bestMatch.annotations].sort((a, b) => a.start - b.start)
             : [];
-
-          // Compare annotations
           const minLength = Math.min(
             sortedAnnotatorAnnotations.length,
             sortedTestAnnotations.length
@@ -678,7 +461,6 @@ const AnnotationAnalysisApp: React.FC = () => {
             const annAnnotation = sortedAnnotatorAnnotations[i];
             const testAnnotation = sortedTestAnnotations[i];
 
-            // Compare text and tag (case insensitive for text)
             if (
               annAnnotation.text.toLowerCase() ===
                 testAnnotation.text.toLowerCase() &&
@@ -689,15 +471,11 @@ const AnnotationAnalysisApp: React.FC = () => {
 
             totalAnnotations++;
           }
-
-          // If annotator has more annotations than test data
           if (sortedAnnotatorAnnotations.length > minLength) {
             totalAnnotations += sortedAnnotatorAnnotations.length - minLength;
           }
         }
       });
-
-      // Calculate accuracy for this annotator
       const accuracy =
         totalAnnotations > 0 ? totalMatches / totalAnnotations : 0;
       accuracyResults[folder] = {
@@ -706,8 +484,6 @@ const AnnotationAnalysisApp: React.FC = () => {
         total: totalAnnotations,
       };
     });
-
-    // Calculate average accuracy
     const totalAccuracy = Object.values(accuracyResults).reduce(
       (sum: any, result: any) => sum + result.accuracy,
       0
@@ -801,12 +577,6 @@ const AnnotationAnalysisApp: React.FC = () => {
     const matchingFiles = findMatchingFiles(text);
     setComparisonFiles(matchingFiles);
     setComparisonText(text);
-
-    // Get the corresponding correct annotation from test data
-    // const testData = TEST_SET_1;
-    // const processedTestData = processTestData(testData);
-    // const matchingTestData = findBestMatchingTestData(text, processedTestData);
-
     setIsComparisonModalOpen(true);
   };
 
@@ -864,7 +634,35 @@ const AnnotationAnalysisApp: React.FC = () => {
       secretAccessKey: import.meta.env.VITE_SECRET_ACCESS_KEY,
     },
   });
+  const [labelCounts, setLabelCounts] = useState<Record<
+    string,
+    Record<string, number>
+  > | null>(null);
+  const calculateAnnotatorLabelsPerSet = () => {
+    const labelCounts: Record<string, Record<string, number>> = {};
 
+    Object.entries(folderAnnotations).forEach(([folder, files]) => {
+      // Khởi tạo đối tượng đếm nhãn cho annotator này
+      labelCounts[folder] = {};
+
+      // Đếm nhãn từ các annotations
+      files.forEach((file) => {
+        file.result.forEach((result) => {
+          const labels = result.value.labels;
+
+          // Đếm mỗi loại nhãn
+          labels.forEach((label) => {
+            if (!labelCounts[folder][label]) {
+              labelCounts[folder][label] = 0;
+            }
+            labelCounts[folder][label]++;
+          });
+        });
+      });
+    });
+
+    return labelCounts;
+  };
   const fetchAnnotationFiles = async () => {
     setIsLoading(true);
     try {
@@ -872,9 +670,15 @@ const AnnotationAnalysisApp: React.FC = () => {
 
       // Fetch files from each annotator folder
       for (const folder of Object.keys(ANNOTATORS)) {
+        // Modify prefix based on selected set
+        let prefixFolder = folder;
+        if (selectedSet > 1) {
+          prefixFolder = `${folder}_${selectedSet}`;
+        }
+
         const command = new ListObjectsV2Command({
           Bucket: import.meta.env.VITE_S3_BUCKET,
-          Prefix: `${folder}/`,
+          Prefix: `${prefixFolder}/`,
         });
 
         const response = await s3Client.send(command);
@@ -891,7 +695,7 @@ const AnnotationAnalysisApp: React.FC = () => {
 
             try {
               const parsedFile = JSON.parse(fileText || "{}") as AnnotationFile;
-              // Add source folder for tracking
+              // Add source folder for tracking - use the original folder name for consistency
               parsedFile.sourceFolder = folder;
               return parsedFile;
             } catch {
@@ -918,7 +722,9 @@ const AnnotationAnalysisApp: React.FC = () => {
       setIsLoading(false);
     }
   };
-
+  useEffect(() => {
+    fetchAnnotationFiles();
+  }, [selectedSet]);
   const calculateAnnotatorAgreement = () => {
     const annotatorKeys = Object.keys(folderAnnotations);
 
@@ -928,21 +734,78 @@ const AnnotationAnalysisApp: React.FC = () => {
     }
 
     try {
-      // Extract labels from different annotators
-      const annotatorLabels = annotatorKeys.map((folder) =>
-        folderAnnotations[folder].flatMap((file) =>
-          file.result.map((result) => result.value.labels[0])
-        )
-      );
+      // Calculate pairwise precision between annotators
+      const pairwisePrecision: Record<
+        string,
+        { precision: number; matches: number; total: number }
+      > = {};
+      const allPrecisionScores = [];
 
-      // Calculate both metrics
-      const result = {
-        alpha: calculateKrippendorffAlpha(annotatorLabels),
-        fleiss: calculateFleissKappa(annotatorLabels),
-        icc: calculateICC(annotatorLabels),
-      };
+      for (let i = 0; i < annotatorKeys.length; i++) {
+        for (let j = i + 1; j < annotatorKeys.length; j++) {
+          const annotator1 = annotatorKeys[i];
+          const annotator2 = annotatorKeys[j];
+          const pairKey = `${ANNOTATORS[annotator1]}-${ANNOTATORS[annotator2]}`;
 
-      setAnnotatorAgreement(result);
+          let totalMatches = 0;
+          let totalAnnotations = 0;
+          const files1 = folderAnnotations[annotator1];
+          files1.forEach((file1) => {
+            const file2 = folderAnnotations[annotator2].find(
+              (f) => f.task.data.text === file1.task.data.text
+            );
+            if (file2) {
+              const annotations1 = file1.result.map((r) => ({
+                start: r.value.start,
+                end: r.value.end,
+                label: r.value.labels[0],
+              }));
+
+              const annotations2 = file2.result.map((r) => ({
+                start: r.value.start,
+                end: r.value.end,
+                label: r.value.labels[0],
+              }));
+              annotations1.forEach((anno1) => {
+                const matchingAnno = annotations2.find(
+                  (anno2) =>
+                    Math.abs(anno1.start - anno2.start) == 0 &&
+                    Math.abs(anno1.end - anno2.end) == 0 &&
+                    anno1.label === anno2.label
+                );
+
+                if (matchingAnno) {
+                  totalMatches++;
+                }
+                totalAnnotations++;
+              });
+            }
+          });
+
+          const precision =
+            totalAnnotations > 0 ? totalMatches / totalAnnotations : 0;
+          pairwisePrecision[pairKey] = {
+            precision,
+            matches: totalMatches,
+            total: totalAnnotations,
+          };
+
+          allPrecisionScores.push(precision);
+        }
+      }
+
+      // Calculate average precision across all pairs
+      const averagePrecision =
+        allPrecisionScores.length > 0
+          ? allPrecisionScores.reduce((sum, score) => sum + score, 0) /
+            allPrecisionScores.length
+          : 0;
+
+      // Update the state with only precision-based metrics
+      setAnnotatorAgreement({
+        pairwisePrecision,
+        averagePrecision,
+      });
     } catch (error) {
       console.error("Error calculating agreement", error);
     }
@@ -961,7 +824,31 @@ const AnnotationAnalysisApp: React.FC = () => {
       ])
     );
   };
+  const calculateTestDataLabelCounts = () => {
+    // Lấy test data cho set hiện tại
+    const testData =
+      1 <= selectedSet && selectedSet <= 10
+        ? TEST_SETS[selectedSet]
+        : TEST_SETS[1];
 
+    // Khởi tạo đối tượng đếm nhãn
+    const labelCounts: Record<string, number> = {};
+
+    // Xử lý và đếm nhãn
+    const processedData = processTestData(testData);
+
+    processedData.forEach((item) => {
+      item.annotations.forEach((annotation) => {
+        const label = annotation.tag;
+        if (!labelCounts[label]) {
+          labelCounts[label] = 0;
+        }
+        labelCounts[label]++;
+      });
+    });
+
+    return labelCounts;
+  };
   useEffect(() => {
     fetchAnnotationFiles();
   }, []);
@@ -970,14 +857,6 @@ const AnnotationAnalysisApp: React.FC = () => {
     setExpandedAnnotator(expandedAnnotator === annotator ? null : annotator);
   };
 
-  const interpretAgreement = (value: number) => {
-    if (value < 0) return "Độ đồng thuận kém";
-    if (value < 0.2) return "Độ đồng thuận rất thấp";
-    if (value < 0.4) return "Độ đồng thuận tạm được";
-    if (value < 0.6) return "Độ đồng thuận trung bình";
-    if (value < 0.8) return "Độ đồng thuận khá cao";
-    return "Độ đồng thuận gần như hoàn hảo";
-  };
   // Add custom CSS to handle the annotation display with labels
   React.useEffect(() => {
     const style = document.createElement("style");
@@ -1033,11 +912,161 @@ const AnnotationAnalysisApp: React.FC = () => {
           ))}
         </div>
       </div>
+      <div className="mb-6 p-4 bg-white  border-black border-4 rounded-lg text-black">
+        <h2 className="text-lg font-semibold mb-3">Chọn bộ dữ liệu</h2>
 
+        <div className="flex flex-wrap gap-2 mb-3">
+          {availableSets.map((setNumber) => (
+            <button
+              key={setNumber}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                selectedSet === setNumber
+                  ? "bg-purple-600 text-red-400"
+                  : "bg-gray-200 text-white hover:bg-gray-300"
+              }`}
+              onClick={() => setSelectedSet(setNumber)}
+            >
+              Bộ dữ liệu {setNumber}
+              {setNumber === 1 ? " (mặc định)" : ""}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center mt-3">
+          <input
+            type="number"
+            min="1"
+            value={customSetInput}
+            onChange={(e) => setCustomSetInput(e.target.value)}
+            placeholder="Set #"
+            className="w-20 px-2 py-1 border rounded-l"
+          />
+          <button
+            onClick={() => {
+              const setNum = parseInt(customSetInput, 10);
+              if (
+                setNum >= 1 &&
+                setNum <= 10 &&
+                !availableSets.includes(setNum)
+              ) {
+                // Add new set to available sets
+                setAvailableSets((prev) =>
+                  [...prev, setNum].sort((a, b) => a - b)
+                );
+                // Select the new set
+                setSelectedSet(setNum);
+                // Clear the input
+                setCustomSetInput("");
+              } else if (setNum > 10) {
+                alert("Số bộ dữ liệu không được lớn hơn 10");
+              }
+            }}
+            disabled={
+              !customSetInput ||
+              isNaN(parseInt(customSetInput, 10)) ||
+              parseInt(customSetInput, 10) < 1
+            }
+            className="px-3 py-1 bg-blue-600 text-white rounded-r hover:bg-blue-700 disabled:bg-gray-400"
+          >
+            Thêm bộ dữ liệu
+          </button>
+
+          {selectedSet !== 1 && (
+            <button
+              onClick={() => {
+                setAvailableSets((prev) =>
+                  prev.filter((s) => s !== selectedSet)
+                );
+                setSelectedSet(1); // Default to set 1 after removal
+              }}
+              className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+              title="Xóa bộ dữ liệu hiện tại khỏi danh sách"
+            >
+              Xóa bộ {selectedSet}
+            </button>
+          )}
+        </div>
+
+        {isLoading && (
+          <div className="mt-3 text-sm text-gray-600">
+            Đang tải dữ liệu từ bộ {selectedSet}...
+          </div>
+        )}
+
+        <p className="mt-3 text-xs text-gray-500">
+          <i>
+            Lưu ý: Bộ dữ liệu 1 là mặc định (không có hậu tố). Các bộ khác sẽ
+            thêm hậu tố "_X" vào tên thư mục (ví dụ: folder_2, folder_3).
+          </i>
+        </p>
+      </div>
       <div className="mb-8">
         <LabelLegend />
       </div>
+      <div className="mb-8 p-4 bg-black rounded-lg shadow-sm">
+        <h2 className="text-xl font-semibold mb-4 text-amber-50">
+          Thống kê nhãn theo Annotator
+        </h2>
+        <button
+          onClick={() => {
+            const annotatorCounts = calculateAnnotatorLabelsPerSet();
+            const testCounts = calculateTestDataLabelCounts();
+            setLabelCounts({ ...annotatorCounts, test_data: testCounts });
+          }}
+          className="bg-purple-500 text-white px-5 py-2 rounded-md hover:bg-purple-600 transition-colors"
+          disabled={isLoading}
+        >
+          Thống kê nhãn
+        </button>
 
+        {labelCounts && (
+          <div className="mt-4 p-4 bg-white rounded-md shadow-sm">
+            <h3 className="font-bold text-lg text-center mb-4 text-black">
+              Thống kê số nhãn cho bộ dữ liệu {selectedSet}
+            </h3>
+
+            <div className="overflow-x-auto text-black">
+              <table className="min-w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-100">
+                    <th className="border p-2 text-left">Annotator</th>
+                    {LABELS.map((label) => (
+                      <th key={label} className="border p-2 text-center">
+                        {label}
+                      </th>
+                    ))}
+                    <th className="border p-2 text-center font-bold">Tổng</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(labelCounts).map(([folder, counts]) => {
+                    const total = Object.values(counts).reduce(
+                      (sum, count) => sum + count,
+                      0
+                    );
+
+                    return (
+                      <tr key={folder} className="hover:bg-gray-50">
+                        <td className="border p-2 font-medium">
+                          {ANNOTATORS[folder] || folder}
+                        </td>
+                        {LABELS.map((label) => (
+                          <td key={label} className="border p-2 text-center">
+                            {counts[label] || 0}
+                          </td>
+                        ))}
+                        <td className="border p-2 text-center font-bold">
+                          {total}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
       <div className="mb-8 p-4 bg-black rounded-lg shadow-sm">
         <h2 className="text-xl font-semibold mb-4 text-amber-50">
           Độ đồng thuận Annotator
@@ -1047,83 +1076,55 @@ const AnnotationAnalysisApp: React.FC = () => {
           className="bg-blue-500 text-white px-5 py-2 rounded-md hover:bg-blue-600 transition-colors"
           disabled={isLoading}
         >
-          {isLoading ? "Data đang load" : "Calculate Agreement"}
+          {isLoading ? "Data đang load" : "Tính độ đồng thuận"}
         </button>
 
         {annotatorAgreement !== null && (
           <div className="mt-4 p-4 bg-white rounded-md shadow-sm">
-            {/* Display all metrics in a grid layout */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Krippendorff's Alpha */}
-              <div className="p-3 border rounded-lg bg-blue-50">
-                <h3 className="font-bold text-lg text-black">
-                  Krippendorff's Alpha
-                </h3>
+            {/* Display precision-based metrics */}
+            <div className="mb-4">
+              <h3 className="font-bold text-lg text-center text-black mb-3">
+                Kết quả đánh giá độ đồng thuận
+              </h3>
+              {/* <div className="p-3 border rounded-lg bg-blue-50 mb-4">
+                <h4 className="font-semibold text-black">
+                  Độ đồng thuận trung bình
+                </h4>
                 <div className="text-2xl font-semibold text-blue-600">
-                  {annotatorAgreement.alpha?.toFixed(3) || "N/A"}
+                  {(annotatorAgreement.averagePrecision !== undefined
+                    ? annotatorAgreement.averagePrecision * 100
+                    : 0
+                  ).toFixed(2)}
+                  %
                 </div>
-                <p className="mt-1 text-sm text-gray-700">
-                  {interpretAgreement(annotatorAgreement.alpha || 0)}
-                </p>
                 <p className="text-xs text-gray-500 mt-2">
-                  Đặc biệt phù hợp cho dữ liệu nhãn có mất mát hoặc không đều
+                  Tỷ lệ trung bình các nhãn giống nhau giữa các cặp annotator
                 </p>
-              </div>
-
-              {/* Fleiss' Kappa */}
-              <div className="p-3 border rounded-lg bg-green-50">
-                <h3 className="font-bold text-lg text-black">Fleiss' Kappa</h3>
-                <div className="text-2xl font-semibold text-green-600">
-                  {annotatorAgreement.fleiss?.toFixed(3) || "N/A"}
-                </div>
-                <p className="mt-1 text-sm text-gray-700">
-                  {interpretAgreement(annotatorAgreement.fleiss || 0)}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Phổ biến cho đánh giá độ đồng thuận giữa nhiều người gán nhãn
-                </p>
-              </div>
-
-              {/* ICC */}
-              <div className="p-3 border rounded-lg bg-purple-50">
-                <h3 className="font-bold text-lg text-black">
-                  Intra-class Correlation (ICC)
-                </h3>
-                <div className="text-2xl font-semibold text-purple-600">
-                  {annotatorAgreement.icc?.toFixed(3) || "N/A"}
-                </div>
-                <p className="mt-1 text-sm text-gray-700">
-                  {interpretAgreement(annotatorAgreement.icc || 0)}
-                </p>
-                <p className="text-xs text-gray-500 mt-2">
-                  Đo lường sự nhất quán và độ tin cậy tuyệt đối
-                </p>
-              </div>
+              </div> */}
             </div>
 
-            {/* Add a legend that explains the metrics */}
-            <div className="mt-4 pt-3 border-t text-sm">
-              <p className="font-medium text-gray-700">Về các thước đo:</p>
-              <ul className="mt-2 list-disc pl-5 text-gray-600 space-y-1">
-                <li>
-                  <span className="font-medium">Krippendorff's Alpha:</span> Phù
-                  hợp nhất cho dữ liệu có nhiều annotator và dữ liệu không đầy
-                  đủ.
-                </li>
-                <li>
-                  <span className="font-medium">Fleiss' Kappa:</span> Mở rộng
-                  của Cohen's Kappa cho nhiều annotator, phù hợp với dữ liệu
-                  phân loại.
-                </li>
-                <li>
-                  <span className="font-medium">ICC:</span> Đo lường mức độ nhất
-                  quán giữa các đánh giá của cùng một nhóm người đánh giá.
-                </li>
-              </ul>
-              <p className="mt-2 text-gray-500 italic">
-                Giá trị từ 0.61-0.80 được coi là độ đồng thuận khá cao, trên
-                0.80 là gần như hoàn hảo.
-              </p>
+            {/* Display pairwise precision between annotators */}
+            <h4 className="font-semibold text-black mb-3">
+              Độ đồng thuận giữa các Annotator
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {annotatorAgreement.pairwisePrecision &&
+                Object.entries(annotatorAgreement.pairwisePrecision).map(
+                  ([pairKey, data]) => (
+                    <div
+                      key={pairKey}
+                      className="p-3 border rounded-lg bg-green-50"
+                    >
+                      <h4 className="font-semibold text-black">{pairKey}</h4>
+                      <div className="text-xl font-bold text-green-600">
+                        {(data.precision * 100).toFixed(2)}%
+                      </div>
+                      {/* <p className="text-sm text-gray-600">
+                        {data.matches} giống nhau trên tổng {data.total} nhãn
+                      </p> */}
+                    </div>
+                  )
+                )}
             </div>
           </div>
         )}
@@ -1162,9 +1163,9 @@ const AnnotationAnalysisApp: React.FC = () => {
                     <div className="text-xl font-bold text-yellow-600">
                       {(result.accuracy * 100).toFixed(2)}%
                     </div>
-                    <p className="text-sm text-gray-600">
+                    {/* <p className="text-sm text-gray-600">
                       {result.matches} đúng trên tổng số {result.total} nhãn
-                    </p>
+                    </p> */}
                   </div>
                 )
               )}
@@ -1277,10 +1278,8 @@ const AnnotationAnalysisApp: React.FC = () => {
                                 )}
                               </p>
                               <p>
-                                <span className="font-medium">
-                                  Annotations:
-                                </span>{" "}
                                 {file.result.length}
+                                <span className="font-medium"> nhãn</span>{" "}
                               </p>
                               <p>
                                 <span className="font-medium">ID:</span>{" "}
@@ -1307,7 +1306,11 @@ const AnnotationAnalysisApp: React.FC = () => {
         correctAnnotations={
           findBestMatchingTestData(
             comparisonText,
-            processTestData(TEST_SET_1)
+            processTestData(
+              1 <= selectedSet && selectedSet <= 10
+                ? TEST_SETS[selectedSet]
+                : TEST_SETS[1]
+            )
           ) || undefined
         }
       />
