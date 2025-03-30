@@ -1,54 +1,124 @@
-# React + TypeScript + Vite
+# Web Annotation Tool
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+A comprehensive web application for annotating text with POS (Part-of-Speech) tags and analyzing annotator agreement. This tool allows multiple annotators to label text and compare their annotations against standard datasets, providing insights into annotation consistency and quality.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features
 
-## Expanding the ESLint configuration
+- **Text Annotation**: Highlight and assign POS tags to text segments
+- **Multi-Annotator Support**: Compare annotations from different contributors
+- **Annotator Agreement Analysis**: Calculate and visualize consensus metrics between annotators
+- **Standard Dataset Comparison**: Compare annotations against benchmark datasets
+- **Visual Annotation Display**: Color-coded highlighting with intuitive label overlay
+- **AWS S3 Integration**: Secure storage and retrieval of annotation data
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Technology Stack
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+- **Frontend**: React 19 with TypeScript
+- **UI Framework**: Tailwind CSS
+- **Build Tool**: Vite
+- **Cloud Storage**: AWS S3
+- **Development Tools**: ESLint, TypeScript
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js (v18 or later)
+- npm or yarn
+- AWS account with S3 bucket access
+
+### Installation
+
+1. Clone the repository:
+   ```
+   git clone https://github.com/yourusername/web_annotation.git
+   cd web_annotation/web_annotate
+   ```
+
+2. Install dependencies:
+   ```
+   npm install
+   ```
+
+3. Configure environment variables:
+   Create a `.env` file in the project root with the following variables:
+   ```
+   VITE_AWS_REGION=your-aws-region
+   VITE_ACCESS_KEY_ID=your-access-key
+   VITE_SECRET_ACCESS_KEY=your-secret-key
+   VITE_S3_BUCKET=your-s3-bucket-name
+   ```
+
+4. Start the development server:
+   ```
+   npm run dev
+   ```
+
+## Usage
+
+### Annotating Text
+1. Select a text from the available corpus
+2. Highlight words or phrases to tag
+3. Choose the appropriate POS tag from the label legend
+4. Save annotations to the S3 bucket
+
+### Comparing Annotations
+1. Navigate to the comparison section
+2. Select annotations from different annotators
+3. View side-by-side comparison with color-coded highlights
+4. Compare against standard test sets for accuracy measurement
+
+### Analyzing Agreement
+1. Select annotators to compare
+2. Click "Calculate Agreement" to process data
+3. View metrics including precision, recall, and F1 score
+4. Identify areas of disagreement for further review
+
+## POS Tag Set
+
+The application uses the following POS tag set:
+
+| Tag | Description | Color Code |
+|-----|-------------|------------|
+| N   | Danh từ     | #4CAF50   |
+| Np  | Danh từ riêng | #2196F3 |
+| Nc  | Danh từ chỉ loại | #FF9800 |
+| Nu  | Danh từ đơn vị | #9C27B0 |
+| V   | Động từ     | #E91E63   |
+| A   | Tính từ     | #FFC107   |
+| P   | Đại từ      | #3F51B5   |
+| L   | Định từ     | #00BCD4   |
+| M   | Số từ       | #795548   |
+| R   | Trạng từ    | #FF4500   |
+| E   | Giới từ     | #ADFF2F   |
+| C   | Liên từ     | #7FFF00   |
+| I   | Thán từ     | #00CED1   |
+| T   | Trợ từ      | #FF69B4   |
+| U   | Từ đơn tính | #6A5ACD   |
+| Y   | Từ viết tắt | #00FA9A   |
+| X   | Không phân loại | #8B0000 |
+
+## Build for Production
+
+```
+npm run build
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+The built files will be in the `dist` directory, ready for deployment.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## License
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+This project is licensed under the MIT License - see the LICENSE file for details.
+
+## Contributors
+
+- Tấn Lợi (Annotation Analysis)
+- Phương Ngân (Annotator)
+- Lê Ngọc (Annotator)
+- Minh Ngọc (Annotator)
+
+## Acknowledgments
+
+- Test datasets provided by Vietnamese POS tagging research community
