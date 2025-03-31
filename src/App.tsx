@@ -91,9 +91,9 @@ const LABEL_COLORS: Record<string, string> = {
 
 // Annotator mapping (folder name to display name)
 const ANNOTATORS: Record<string, string> = {
-  phuong_ngan: "Phương Ngân",
-  le_ngoc: "Lê Ngọc",
-  minh_ngoc: "Minh Ngọc",
+  phuong_ngan: "Annotator 1",
+  le_ngoc: "Annotator 2",
+  minh_ngoc: "Annotator 3",
 };
 
 interface AnnotationValue {
