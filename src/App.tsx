@@ -7,6 +7,8 @@ import {
   ListObjectsV2Command,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import "./App.css";
 import TEST_SET_1 from "./assets/test_pos/test_set_1_output_pos.json";
 import TEST_SET_2 from "./assets/test_pos/test_set_2_output_pos.json";
@@ -362,6 +364,11 @@ const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonFiles, setComparisonFiles] = useState<
     Record<string, AnnotationFile | null>
   >({});
+  const [isUsingLocalFiles, setIsUsingLocalFiles] = useState<boolean>(false);
+  const [localAnnotationFiles, setLocalAnnotationFiles] = useState<
+    Record<string, AnnotationFile[]>
+  >({});
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const findMatchingFiles = (text: string) => {
     const matches: Record<string, AnnotationFile | null> = {};
@@ -664,8 +671,23 @@ const AnnotationAnalysisApp: React.FC = () => {
     return labelCounts;
   };
   const fetchAnnotationFiles = async () => {
+    if (isUsingLocalFiles) {
+      loadLocalAnnotationFiles(selectedSet);
+      return;
+    }
+
     setIsLoading(true);
     try {
+      // Try to load files from local assets first
+      const localAssetFiles = await loadAnnotationFilesFromAssets(selectedSet);
+
+      if (Object.keys(localAssetFiles).length > 0) {
+        console.log("Loaded annotation files from local assets");
+        setFolderAnnotations(localAssetFiles);
+        return;
+      }
+
+      // If no local assets, fall back to S3
       const allFiles: Record<string, AnnotationFile[]> = {};
 
       // Fetch files from each annotator folder
@@ -722,9 +744,6 @@ const AnnotationAnalysisApp: React.FC = () => {
       setIsLoading(false);
     }
   };
-  useEffect(() => {
-    fetchAnnotationFiles();
-  }, [selectedSet]);
   const calculateAnnotatorAgreement = () => {
     const annotatorKeys = Object.keys(folderAnnotations);
 
@@ -849,9 +868,234 @@ const AnnotationAnalysisApp: React.FC = () => {
 
     return labelCounts;
   };
+  const downloadAllAnnotationFiles = async () => {
+    setIsLoading(true);
+    try {
+      const zip = new JSZip();
+
+      // For each annotator
+      for (const folder of Object.keys(ANNOTATORS)) {
+        // Download files for all sets (1-10)
+        for (let setNum = 1; setNum <= 10; setNum++) {
+          // Determine the correct prefix based on set number
+          let prefixFolder = folder;
+          if (setNum > 1) {
+            prefixFolder = `${folder}_${setNum}`;
+          }
+
+          // Create a folder in the zip with the exact prefix name
+          const prefixFolderInZip = zip.folder(prefixFolder);
+          if (!prefixFolderInZip) continue;
+
+          // List objects from S3
+          const command = new ListObjectsV2Command({
+            Bucket: import.meta.env.VITE_S3_BUCKET,
+            Prefix: `${prefixFolder}/`,
+          });
+
+          const response = await s3Client.send(command);
+
+          if (response.Contents && response.Contents.length > 0) {
+            // Download each file in this set
+            for (const file of response.Contents) {
+              if (file.Key && !file.Key.endsWith("/")) {
+                const getCommand = new GetObjectCommand({
+                  Bucket: import.meta.env.VITE_S3_BUCKET,
+                  Key: file.Key,
+                });
+
+                const fileResponse = await s3Client.send(getCommand);
+                const fileText = await fileResponse.Body?.transformToString();
+
+                if (fileText) {
+                  // Extract filename from the full path
+                  const fileName = file.Key.split("/").pop();
+                  if (fileName) {
+                    // Add the file to zip, preserving the original prefix
+                    prefixFolderInZip.file(fileName, fileText);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Generate and save the zip file
+      const content = await zip.generateAsync({ type: "blob" });
+      saveAs(content, "annotation_files.zip");
+    } catch (error) {
+      console.error("Error downloading annotation files", error);
+      alert("Error downloading files. See console for details.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadLocalAnnotationFiles = (setNum: number) => {
+    console.log("Loading local annotation files...");
+    setIsLoading(true);
+    try {
+      const allFiles: Record<string, AnnotationFile[]> = {};
+
+      // For each prefix in localAnnotationFiles
+      Object.entries(localAnnotationFiles).forEach(([prefix, files]) => {
+        // Check if this prefix belongs to the current set
+        let prefixSetNum = 1;
+        const prefixParts = prefix.split("_");
+
+        if (prefixParts.length > 2) {
+          // Format like "folder_name_2"
+          const potentialSetNum = parseInt(
+            prefixParts[prefixParts.length - 1],
+            10
+          );
+          if (!isNaN(potentialSetNum)) {
+            prefixSetNum = potentialSetNum;
+          }
+        }
+
+        // Only include files from the selected set
+        if (prefixSetNum === setNum) {
+          // Get the base folder name from the prefix
+          let baseFolder = prefix;
+          if (prefixSetNum > 1) {
+            // Remove the set number suffix to get the base folder
+            const parts = prefix.split("_");
+            baseFolder = parts.slice(0, -1).join("_");
+          }
+
+          // Initialize if needed
+          if (!allFiles[baseFolder]) {
+            allFiles[baseFolder] = [];
+          }
+
+          // Add files to the result
+          allFiles[baseFolder].push(...files);
+        }
+      });
+
+      const sortedFiles = sortTextByTaskDataText(allFiles);
+      setFolderAnnotations(sortedFiles);
+    } catch (error) {
+      console.error("Error loading local annotation files", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadAnnotationFilesFromAssets = async (selectedSet: number) => {
+    const allFiles: Record<string, AnnotationFile[]> = {};
+
+    try {
+      // Get folder names based on annotator keys and set number
+      for (const folder of Object.keys(ANNOTATORS)) {
+        // Determine the correct prefix based on set number
+        let prefixFolder = folder;
+        if (selectedSet > 1) {
+          prefixFolder = `${folder}_${selectedSet}`;
+        }
+
+        try {
+          // Use dynamic import to load all files from the folder
+          const files = import.meta.glob("/src/assets/annotation_files/**/*", {
+            as: "raw", // Import as raw text instead of trying to parse as module
+            eager: true,
+          });
+
+          // Filter files that match our folder prefix
+          const folderFiles: AnnotationFile[] = [];
+
+          for (const path in files) {
+            // Check if the path contains our prefix folder
+            if (path.includes(`/annotation_files/${prefixFolder}/`)) {
+              try {
+                // Get the file content as raw text and parse it manually
+                const fileContent = files[path] as string;
+                // Parse the JSON content
+                const parsedFile = JSON.parse(fileContent) as AnnotationFile;
+
+                // Add source folder for tracking
+                parsedFile.sourceFolder = folder;
+                folderFiles.push(parsedFile);
+              } catch (error) {
+                console.error(`Error parsing file from ${path}:`, error);
+              }
+            }
+          }
+
+          if (folderFiles.length > 0) {
+            if (!allFiles[folder]) {
+              allFiles[folder] = [];
+            }
+            allFiles[folder].push(...folderFiles);
+          }
+        } catch (error) {
+          console.error(
+            `Error loading files for folder ${prefixFolder}:`,
+            error
+          );
+        }
+      }
+
+      return sortTextByTaskDataText(allFiles);
+    } catch (error) {
+      console.error("Error loading annotation files from assets:", error);
+      return {};
+    }
+  };
+
+  const initializeAvailableSetsFromAssets = async () => {
+    try {
+      const files = import.meta.glob("/src/assets/annotation_files/**/*", {
+        as: "raw", // Use raw import
+        eager: true,
+      });
+      const availableSetsFound = new Set<number>();
+
+      // Default set is always available
+      availableSetsFound.add(1);
+
+      for (const path in files) {
+        // Extract the folder name from the path
+        const match = path.match(/\/annotation_files\/([^/]+)/);
+        if (match && match[1]) {
+          const folderName = match[1];
+          // Check if it's a set folder (e.g., phuong_ngan_2)
+          const folderParts = folderName.split("_");
+          if (folderParts.length > 2) {
+            const potentialSetNum = parseInt(
+              folderParts[folderParts.length - 1],
+              10
+            );
+            if (!isNaN(potentialSetNum)) {
+              availableSetsFound.add(potentialSetNum);
+            }
+          }
+        }
+      }
+
+      return Array.from(availableSetsFound).sort((a, b) => a - b);
+    } catch (error) {
+      console.error("Error detecting available sets:", error);
+      return [1]; // Default to set 1 if there's an error
+    }
+  };
+
   useEffect(() => {
+    // Initialize available sets from local assets
+    const initializeSets = async () => {
+      const detectedSets = await initializeAvailableSetsFromAssets();
+      setAvailableSets(detectedSets);
+    };
+
+    initializeSets();
     fetchAnnotationFiles();
   }, []);
+
+  useEffect(() => {
+    fetchAnnotationFiles();
+  }, [selectedSet]);
 
   const toggleAccordion = (annotator: string) => {
     setExpandedAnnotator(expandedAnnotator === annotator ? null : annotator);
@@ -1182,6 +1426,128 @@ const AnnotationAnalysisApp: React.FC = () => {
         )}
       </div>
 
+      {/* Download and Local Files UI */}
+      {/* <div className="mb-6 p-4 bg-white border-black border-4 rounded-lg">
+        <h2 className="text-lg font-semibold mb-3 text-black">
+          Tải xuống & Sử dụng dữ liệu cục bộ
+        </h2>
+
+        <div className="flex flex-wrap gap-3 items-center">
+          <button
+            onClick={downloadAllAnnotationFiles}
+            className={`px-4 py-2 rounded-md transition-colors ${
+              isLoading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-green-600 hover:bg-green-700"
+            } text-white`}
+            disabled={isLoading}
+          >
+            {isLoading ? "Đang tải..." : "Tải xuống tất cả dữ liệu"}
+          </button>
+
+          <span className="mx-2 text-gray-500">hoặc</span>
+
+          <div className="relative">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleLocalFilesUpload}
+              accept=".zip"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className={`px-4 py-2 rounded-md transition-colors ${
+                isUsingLocalFiles
+                  ? "bg-blue-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+              } ${isUsingLocalFiles ? "text-white" : "text-black"}`}
+            >
+              {isUsingLocalFiles
+                ? "Đang sử dụng dữ liệu cục bộ"
+                : "Chọn file zip đã tải xuống"}
+            </button>
+          </div>
+
+          {isUsingLocalFiles && (
+            <button
+              onClick={() => {
+                setIsUsingLocalFiles(false);
+                fetchAnnotationFiles();
+              }}
+              className="px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 text-sm"
+            >
+              Quay lại dùng dữ liệu từ S3
+            </button>
+          )}
+        </div>
+
+        {isUsingLocalFiles && (
+          <div className="mt-3 text-sm text-green-600">
+            <span className="font-medium">✓</span> Đang sử dụng dữ liệu cục bộ
+            đã tải lên - {Object.keys(localAnnotationFiles).length} thư mục được
+            tìm thấy
+          </div>
+        )}
+
+        <p className="mt-3 text-xs text-gray-500">
+          <i>
+            Bạn có thể tải tất cả dữ liệu xuống để sử dụng offline. Khi đã tải
+            xuống, bạn có thể tải lên file zip để sử dụng thay vì tải từ S3 mỗi
+            lần. Cấu trúc thư mục gốc sẽ được bảo toàn với tên prefix đầy đủ.
+          </i>
+        </p>
+      </div> */}
+
+      {/* Add this below the "Download & Local Files" section */}
+      <div className="mb-6 p-4 bg-white border-black border-4 rounded-lg">
+        <h2 className="text-lg font-semibold mb-3 text-black">
+          Trạng thái nguồn dữ liệu
+        </h2>
+
+        <div className="flex flex-col gap-2">
+          <div className="p-3 border rounded-lg bg-green-50 text-green-800">
+            <div className="flex items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-2"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <span className="font-medium">
+                Dữ liệu được tải từ thư mục local:
+              </span>
+            </div>
+            <div className="mt-1 ml-7 text-sm">
+              <code>src/assets/annotation_files</code>
+            </div>
+          </div>
+
+          <div className="mt-2 text-sm text-gray-600">
+            <p>
+              <strong>Bộ dữ liệu hiện tại:</strong> {selectedSet}
+            </p>
+            <p>
+              <strong>Bộ dữ liệu có sẵn:</strong> {availableSets.join(", ")}
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-gray-500">
+          <i>
+            Hệ thống tự động nạp dữ liệu từ thư mục local trước khi tìm kiếm
+            trên S3. Cấu trúc thư mục tuân theo quy tắc: [tên_annotator]_[số_bộ]
+            (ví dụ: phuong_ngan_2).
+          </i>
+        </p>
+      </div>
+
       {isLoading ? (
         <div className="text-center p-12">
           <p className="text-lg">Loading annotation data...</p>
@@ -1256,7 +1622,7 @@ const AnnotationAnalysisApp: React.FC = () => {
                                     strokeLinecap="round"
                                     strokeLinejoin="round"
                                     strokeWidth={2}
-                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2"
                                   />
                                 </svg>
                                 So sánh
