@@ -7,8 +7,8 @@ import {
   ListObjectsV2Command,
   GetObjectCommand,
 } from "@aws-sdk/client-s3";
-import JSZip from "jszip";
-import { saveAs } from "file-saver";
+// import JSZip from "jszip";
+// import { saveAs } from "file-saver";
 import "./App.css";
 import TEST_SET_1 from "./assets/test_pos/test_set_1_output_pos.json";
 import TEST_SET_2 from "./assets/test_pos/test_set_2_output_pos.json";
@@ -364,11 +364,9 @@ const AnnotationAnalysisApp: React.FC = () => {
   const [comparisonFiles, setComparisonFiles] = useState<
     Record<string, AnnotationFile | null>
   >({});
-  const [isUsingLocalFiles, setIsUsingLocalFiles] = useState<boolean>(false);
-  const [localAnnotationFiles, setLocalAnnotationFiles] = useState<
-    Record<string, AnnotationFile[]>
-  >({});
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isUsingLocalFiles] = useState<boolean>(false);
+  const [localAnnotationFiles] = useState<Record<string, AnnotationFile[]>>({});
+  // const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const findMatchingFiles = (text: string) => {
     const matches: Record<string, AnnotationFile | null> = {};
@@ -868,69 +866,69 @@ const AnnotationAnalysisApp: React.FC = () => {
 
     return labelCounts;
   };
-  const downloadAllAnnotationFiles = async () => {
-    setIsLoading(true);
-    try {
-      const zip = new JSZip();
+  // const downloadAllAnnotationFiles = async () => {
+  //   setIsLoading(true);
+  //   try {
+  //     const zip = new JSZip();
 
-      // For each annotator
-      for (const folder of Object.keys(ANNOTATORS)) {
-        // Download files for all sets (1-10)
-        for (let setNum = 1; setNum <= 10; setNum++) {
-          // Determine the correct prefix based on set number
-          let prefixFolder = folder;
-          if (setNum > 1) {
-            prefixFolder = `${folder}_${setNum}`;
-          }
+  //     // For each annotator
+  //     for (const folder of Object.keys(ANNOTATORS)) {
+  //       // Download files for all sets (1-10)
+  //       for (let setNum = 1; setNum <= 10; setNum++) {
+  //         // Determine the correct prefix based on set number
+  //         let prefixFolder = folder;
+  //         if (setNum > 1) {
+  //           prefixFolder = `${folder}_${setNum}`;
+  //         }
 
-          // Create a folder in the zip with the exact prefix name
-          const prefixFolderInZip = zip.folder(prefixFolder);
-          if (!prefixFolderInZip) continue;
+  //         // Create a folder in the zip with the exact prefix name
+  //         const prefixFolderInZip = zip.folder(prefixFolder);
+  //         if (!prefixFolderInZip) continue;
 
-          // List objects from S3
-          const command = new ListObjectsV2Command({
-            Bucket: import.meta.env.VITE_S3_BUCKET,
-            Prefix: `${prefixFolder}/`,
-          });
+  //         // List objects from S3
+  //         const command = new ListObjectsV2Command({
+  //           Bucket: import.meta.env.VITE_S3_BUCKET,
+  //           Prefix: `${prefixFolder}/`,
+  //         });
 
-          const response = await s3Client.send(command);
+  //         const response = await s3Client.send(command);
 
-          if (response.Contents && response.Contents.length > 0) {
-            // Download each file in this set
-            for (const file of response.Contents) {
-              if (file.Key && !file.Key.endsWith("/")) {
-                const getCommand = new GetObjectCommand({
-                  Bucket: import.meta.env.VITE_S3_BUCKET,
-                  Key: file.Key,
-                });
+  //         if (response.Contents && response.Contents.length > 0) {
+  //           // Download each file in this set
+  //           for (const file of response.Contents) {
+  //             if (file.Key && !file.Key.endsWith("/")) {
+  //               const getCommand = new GetObjectCommand({
+  //                 Bucket: import.meta.env.VITE_S3_BUCKET,
+  //                 Key: file.Key,
+  //               });
 
-                const fileResponse = await s3Client.send(getCommand);
-                const fileText = await fileResponse.Body?.transformToString();
+  //               const fileResponse = await s3Client.send(getCommand);
+  //               const fileText = await fileResponse.Body?.transformToString();
 
-                if (fileText) {
-                  // Extract filename from the full path
-                  const fileName = file.Key.split("/").pop();
-                  if (fileName) {
-                    // Add the file to zip, preserving the original prefix
-                    prefixFolderInZip.file(fileName, fileText);
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
+  //               if (fileText) {
+  //                 // Extract filename from the full path
+  //                 const fileName = file.Key.split("/").pop();
+  //                 if (fileName) {
+  //                   // Add the file to zip, preserving the original prefix
+  //                   prefixFolderInZip.file(fileName, fileText);
+  //                 }
+  //               }
+  //             }
+  //           }
+  //         }
+  //       }
+  //     }
 
-      // Generate and save the zip file
-      const content = await zip.generateAsync({ type: "blob" });
-      saveAs(content, "annotation_files.zip");
-    } catch (error) {
-      console.error("Error downloading annotation files", error);
-      alert("Error downloading files. See console for details.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  //     // Generate and save the zip file
+  //     const content = await zip.generateAsync({ type: "blob" });
+  //     saveAs(content, "annotation_files.zip");
+  //   } catch (error) {
+  //     console.error("Error downloading annotation files", error);
+  //     alert("Error downloading files. See console for details.");
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
 
   const loadLocalAnnotationFiles = (setNum: number) => {
     console.log("Loading local annotation files...");
