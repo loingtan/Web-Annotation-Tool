@@ -2,11 +2,11 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
-import {
-  S3Client,
-  ListObjectsV2Command,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
+// import {
+//   S3Client,
+//   ListObjectsV2Command,
+//   GetObjectCommand,
+// } from "@aws-sdk/client-s3";
 // import JSZip from "jszip";
 // import { saveAs } from "file-saver";
 import "./App.css";
@@ -632,13 +632,13 @@ const AnnotationAnalysisApp: React.FC = () => {
     });
   };
   // S3 Configuration
-  const s3Client = new S3Client({
-    region: import.meta.env.VITE_AWS_REGION,
-    credentials: {
-      accessKeyId: import.meta.env.VITE_ACCESS_KEY_ID,
-      secretAccessKey: import.meta.env.VITE_SECRET_ACCESS_KEY,
-    },
-  });
+  // const s3Client = new S3Client({
+  //   region: import.meta.env.VITE_AWS_REGION,
+  //   credentials: {
+  //     accessKeyId: import.meta.env.VITE_ACCESS_KEY_ID,
+  //     secretAccessKey: import.meta.env.VITE_SECRET_ACCESS_KEY,
+  //   },
+  // });
   const [labelCounts, setLabelCounts] = useState<Record<
     string,
     Record<string, number>
@@ -686,56 +686,56 @@ const AnnotationAnalysisApp: React.FC = () => {
       }
 
       // If no local assets, fall back to S3
-      const allFiles: Record<string, AnnotationFile[]> = {};
+      // const allFiles: Record<string, AnnotationFile[]> = {};
 
-      // Fetch files from each annotator folder
-      for (const folder of Object.keys(ANNOTATORS)) {
-        // Modify prefix based on selected set
-        let prefixFolder = folder;
-        if (selectedSet > 1) {
-          prefixFolder = `${folder}_${selectedSet}`;
-        }
+      // // Fetch files from each annotator folder
+      // for (const folder of Object.keys(ANNOTATORS)) {
+      //   // Modify prefix based on selected set
+      //   let prefixFolder = folder;
+      //   if (selectedSet > 1) {
+      //     prefixFolder = `${folder}_${selectedSet}`;
+      //   }
 
-        const command = new ListObjectsV2Command({
-          Bucket: import.meta.env.VITE_S3_BUCKET,
-          Prefix: `${prefixFolder}/`,
-        });
+      //   const command = new ListObjectsV2Command({
+      //     Bucket: import.meta.env.VITE_S3_BUCKET,
+      //     Prefix: `${prefixFolder}/`,
+      //   });
 
-        const response = await s3Client.send(command);
+      //   const response = await s3Client.send(command);
 
-        const filePromises =
-          response.Contents?.map(async (file) => {
-            const getCommand = new GetObjectCommand({
-              Bucket: import.meta.env.VITE_S3_BUCKET,
-              Key: file.Key,
-            });
+      //   const filePromises =
+      //     response.Contents?.map(async (file) => {
+      //       const getCommand = new GetObjectCommand({
+      //         Bucket: import.meta.env.VITE_S3_BUCKET,
+      //         Key: file.Key,
+      //       });
 
-            const fileResponse = await s3Client.send(getCommand);
-            const fileText = await fileResponse.Body?.transformToString();
+      //       const fileResponse = await s3Client.send(getCommand);
+      //       const fileText = await fileResponse.Body?.transformToString();
 
-            try {
-              const parsedFile = JSON.parse(fileText || "{}") as AnnotationFile;
-              // Add source folder for tracking - use the original folder name for consistency
-              parsedFile.sourceFolder = folder;
-              return parsedFile;
-            } catch {
-              console.error("Error parsing file:", file.Key);
-              return null;
-            }
-          }) || [];
+      //       try {
+      //         const parsedFile = JSON.parse(fileText || "{}") as AnnotationFile;
+      //         // Add source folder for tracking - use the original folder name for consistency
+      //         parsedFile.sourceFolder = folder;
+      //         return parsedFile;
+      //       } catch {
+      //         console.error("Error parsing file:", file.Key);
+      //         return null;
+      //       }
+      //     }) || [];
 
-        const folderFiles = (await Promise.all(filePromises))
-          .filter((file): file is AnnotationFile => file !== null)
-          .slice(0);
+      //   const folderFiles = (await Promise.all(filePromises))
+      //     .filter((file): file is AnnotationFile => file !== null)
+      //     .slice(0);
 
-        if (!allFiles[folder]) {
-          allFiles[folder] = [];
-        }
+      //   if (!allFiles[folder]) {
+      //     allFiles[folder] = [];
+      //   }
 
-        allFiles[folder].push(...folderFiles);
-      }
-      const new_allFiles = sortTextByTaskDataText(allFiles);
-      setFolderAnnotations(new_allFiles);
+      //   allFiles[folder].push(...folderFiles);
+      // }
+      // const new_allFiles = sortTextByTaskDataText(allFiles);
+      // setFolderAnnotations(new_allFiles);
     } catch (error) {
       console.error("Error fetching annotation files", error);
     } finally {
@@ -874,7 +874,7 @@ const AnnotationAnalysisApp: React.FC = () => {
   //     // For each annotator
   //     for (const folder of Object.keys(ANNOTATORS)) {
   //       // Download files for all sets (1-10)
-  //       for (let setNum = 1; setNum <= 10; setNum++) {
+  //       for (let setNum = 8; setNum <= 10; setNum++) {
   //         // Determine the correct prefix based on set number
   //         let prefixFolder = folder;
   //         if (setNum > 1) {
@@ -1079,7 +1079,126 @@ const AnnotationAnalysisApp: React.FC = () => {
       return [1]; // Default to set 1 if there's an error
     }
   };
+  // Add this function to your AnnotationAnalysisApp component
+  // const handleLocalFilesUpload = (
+  //   event: React.ChangeEvent<HTMLInputElement>
+  // ) => {
+  //   const files = event.target.files;
+  //   if (!files || files.length === 0) return;
 
+  //   setIsLoading(true);
+
+  //   const zip = files[0];
+  //   const reader = new FileReader();
+
+  //   reader.onload = async (e) => {
+  //     try {
+  //       if (!e.target?.result) throw new Error("Failed to read zip file");
+
+  //       const zipData = await JSZip.loadAsync(e.target.result);
+  //       const localFiles: Record<string, AnnotationFile[]> = {};
+
+  //       // Process each file in the zip
+  //       const filePromises: Promise<void>[] = [];
+
+  //       zipData.forEach((relativePath, zipEntry) => {
+  //         if (!zipEntry.dir) {
+  //           // Path format: prefixFolder/filename.json
+  //           const pathParts = relativePath.split("/");
+  //           if (pathParts.length >= 1) {
+  //             const prefixFolder = pathParts[0]; // This is the original prefix (e.g., "phuong_ngan" or "phuong_ngan_2")
+  //             const fileName = pathParts[1]; // The actual filename
+
+  //             if (fileName) {
+  //               const promise = zipEntry.async("string").then((content) => {
+  //                 try {
+  //                   const parsedFile = JSON.parse(content) as AnnotationFile;
+
+  //                   // Extract the base folder name and set number from the prefix
+  //                   let baseFolder = prefixFolder;
+  //                   let setNum = 1;
+
+  //                   const prefixParts = prefixFolder.split("_");
+  //                   if (prefixParts.length > 2) {
+  //                     // Format like "folder_name_2"
+  //                     setNum = parseInt(
+  //                       prefixParts[prefixParts.length - 1],
+  //                       10
+  //                     );
+  //                     if (!isNaN(setNum)) {
+  //                       baseFolder = prefixParts.slice(0, -1).join("_");
+  //                     }
+  //                   }
+
+  //                   // Store the original prefix information
+  //                   parsedFile.sourceFolder = baseFolder;
+
+  //                   // Initialize nested structure if needed
+  //                   if (!localFiles[prefixFolder]) {
+  //                     localFiles[prefixFolder] = [];
+  //                   }
+
+  //                   localFiles[prefixFolder].push(parsedFile);
+  //                 } catch (error) {
+  //                   console.error("Error parsing file:", relativePath, error);
+  //                 }
+  //               });
+
+  //               filePromises.push(promise);
+  //             }
+  //           }
+  //         }
+  //       });
+
+  //       // Wait for all files to be processed
+  //       await Promise.all(filePromises);
+
+  //       setLocalAnnotationFiles(localFiles);
+  //       setIsUsingLocalFiles(true);
+
+  //       // Determine available sets from the prefixes
+  //       const availableSetsFound = new Set<number>();
+  //       availableSetsFound.add(1); // Always include set 1 as available
+
+  //       Object.keys(localFiles).forEach((prefix) => {
+  //         // Extract set number from prefix if it exists
+  //         const prefixParts = prefix.split("_");
+  //         if (prefixParts.length > 2) {
+  //           const potentialSetNum = parseInt(
+  //             prefixParts[prefixParts.length - 1],
+  //             10
+  //           );
+  //           if (!isNaN(potentialSetNum)) {
+  //             availableSetsFound.add(potentialSetNum);
+  //           }
+  //         }
+  //       });
+
+  //       setAvailableSets(Array.from(availableSetsFound).sort((a, b) => a - b));
+
+  //       // Load the first set
+  //       if (availableSetsFound.size > 0) {
+  //         const firstSet = Math.min(...availableSetsFound);
+  //         setSelectedSet(firstSet);
+  //         loadLocalAnnotationFiles(firstSet);
+  //       }
+
+  //       console.log("Successfully loaded local files from zip");
+  //     } catch (error) {
+  //       console.error("Error processing zip file", error);
+  //       alert("Error processing zip file. See console for details.");
+  //     } finally {
+  //       setIsLoading(false);
+  //     }
+  //   };
+
+  //   reader.onerror = () => {
+  //     console.error("Error reading file");
+  //     setIsLoading(false);
+  //   };
+
+  //   reader.readAsArrayBuffer(zip);
+  // };
   useEffect(() => {
     // Initialize available sets from local assets
     const initializeSets = async () => {
